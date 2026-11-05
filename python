@@ -1,0 +1,65 @@
+import hashlib
+from cryptography.fernet import Fernet
+
+# --- BANCO DE DADOS EM MEMÓRIA ---
+USUARIOS_DB = {}  # {usuario: senha_hash}
+NOTAS_DB = {}     # {usuario: nota_criptografada}
+
+# Gerando a chave de criptografia para as notas (em produção, salve isso em local seguro!)
+CHAVE_CRIPTOGRAFIA = Fernet.generate_key()
+cipher_suite = Fernet(CHAVE_CRIPTOGRAFIA)
+
+def gerar_hash_senha(senha: str) -> str:
+    """Gera um hash SHA-256 seguro a partir de uma string."""
+    return hashlib.sha256(senha.encode()).hexdigest()
+
+def cadastrar_usuario(usuario: str, senha: str):
+    """Registra um novo usuário salvando apenas o HASH da senha."""
+    if usuario in USUARIOS_DB:
+        print("❌ Erro: Usuário já cadastrado!")
+        return
+    USUARIOS_DB[usuario] = gerar_hash_senha(senha)
+    print(f"✅ Usuário '{usuario}' cadastrado com sucesso!")
+
+def autenticar_usuario(usuario: str, senha: str) -> bool:
+    """Verifica se o hash da senha fornecida bate com o banco."""
+    if usuario not in USUARIOS_DB:
+        return False
+    return USUARIOS_DB[usuario] == gerar_hash_senha(senha)
+
+def salvar_nota_secreta(usuario: str, nota: str):
+    """Criptografa o texto da nota antes de salvar."""
+    nota_bytes = nota.encode()
+    nota_criptografada = cipher_suite.encrypt(nota_bytes)
+    NOTAS_DB[usuario] = nota_criptografada
+    print("🔒 Nota criptografada e salva com sucesso!")
+
+def ler_nota_secreta(usuario: str) -> str:
+    """Descriptografa e exibe a nota do usuário."""
+    if usuario not in NOTAS_DB:
+        return "⚠️ Nenhuma nota encontrada para este usuário."
+    
+    nota_criptografada = NOTAS_DB[usuario]
+    nota_bytes = cipher_suite.decrypt(nota_criptografada)
+    return nota_bytes.decode()
+
+# --- FLUXO DE TESTE DA APLICAÇÃO ---
+if __name__ == "__main__":
+    print("--- 1. Cadastro e Login (Usando HASH) ---")
+    cadastrar_usuario("alice", "SenhaSuperSegura123")
+    
+    # Tentativa de login errada
+    print("Tentativa login (senha errada):", autenticar_usuario("alice", "12345"))
+    # Tentativa de login certa
+    login_sucesso = autenticar_usuario("alice", "SenhaSuperSegura123")
+    print("Tentativa login (senha certa):", login_sucesso)
+
+    if login_sucesso:
+        print("\n--- 2. Guardando Informações (Usando CRIPTOGRAFIA) ---")
+        salvar_nota_secreta("alice", "Meu segredo: Comprei bitcoin a 10k e não contei pra ninguém.")
+        
+        print("\nComo a nota fica no banco de dados:", NOTAS_DB["alice"])
+        
+        print("\nRecuperando a nota descriptografada:")
+        print("Nota lida:", ler_nota_secreta("alice"))
+Use o código com cuidado.
